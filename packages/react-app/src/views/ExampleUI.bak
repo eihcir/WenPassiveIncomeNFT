@@ -1,0 +1,601 @@
+import { SellRequest } from "@rarible/protocol-ethereum-sdk/build/order/sell";
+import React, { useEffect, useState } from "react";
+import {
+  createRaribleSdk,
+  isLazyErc1155Collection,
+  isLazyErc721Collection,
+  isLegacyErc1155Collection,
+  isLegacyErc721Collection,
+  RaribleSdk,
+} from "@rarible/protocol-ethereum-sdk";
+import { toAddress, toBigNumber } from "@rarible/types";
+import { NftCollection_Type, NftItem } from "@rarible/protocol-api-client";
+import Web3 from "web3";
+import { Web3Ethereum } from "@rarible/web3-ethereum";
+
+const NETWORK = "localhost";
+
+export const debounce = (func, waitFor) => {
+  let timeout;
+
+  const debounced = (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+
+  return debounced;
+};
+
+export async function retry(num, fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    if (num > 0) {
+      await delay(500);
+      return retry(num - 1, fn);
+    } else {
+      return Promise.reject(e);
+    }
+  }
+}
+
+function delay(time) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve();
+    }, time);
+  });
+}
+
+// type CreateOrderFormState = {
+// 	contract: string,
+// 	tokenId: string,
+// 	price: string,
+// 	hash: string
+// }
+
+// type BuyOrderFormState = {
+// 	hash: string,
+// 	amount: string
+// }
+
+// type DashboardProps = {
+// 	provider: any
+// 	sdk: RaribleSdk
+// 	accounts: string[]
+// }
+
+// type MintForm = { id: string, type: NftCollection_Type, isLazySupported: boolean, isLazy: boolean, loading: boolean }
+
+const mintFormInitial = {
+  id: "0x6ede7f3c26975aad32a475e1021d8f6f39c89d82", // default collection on "rinkeby" that supports lazy minting
+  type: "ERC721",
+  isLazy: true,
+  isLazySupported: true,
+  loading: false,
+};
+
+const Dashboard = ({ provider, sdk, accounts }) => {
+  const [collection, setCollection] = useState(mintFormInitial);
+  const [ownedItems, setOwnedItems] = useState();
+  const [createOrderForm, setCreateOrderForm] = useState({
+    contract: "",
+    tokenId: "",
+    price: "10",
+    hash: "",
+  });
+  const [purchaseOrderForm, setPurchaseOrderForm] = useState({ hash: "", amount: "1" });
+  /**
+   * Handle connect to wallet
+   */
+  const connectWalletHandler = () => {
+    provider.request({ method: "eth_requestAccounts" });
+  };
+
+  /**
+   * Mint Nft
+   */
+  const mint = async () => {
+    let tokenId;
+    const nftCollection = await sdk.apis.nftCollection.getNftCollectionById({ collection: collection.id });
+    if (isLazyErc721Collection(nftCollection)) {
+      const resp = await sdk.nft.mint({
+        collection: nftCollection,
+        uri: "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
+        creators: [{ account: toAddress(accounts[0]), value: 10000 }],
+        royalties: [],
+        lazy: collection.isLazy,
+      });
+      tokenId = resp.tokenId;
+    } else if (isLazyErc1155Collection(nftCollection)) {
+      const resp = await sdk.nft.mint({
+        collection: nftCollection,
+        uri: "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
+        creators: [{ account: toAddress(accounts[0]), value: 10000 }],
+        royalties: [],
+        supply: toBigNumber("1"),
+        lazy: collection.isLazy,
+      });
+      tokenId = resp.tokenId;
+    } else if (isLegacyErc721Collection(nftCollection)) {
+      const resp = await sdk.nft.mint({
+        collection: nftCollection,
+        uri: "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
+        royalties: [],
+      });
+      tokenId = resp.tokenId;
+    } else if (isLegacyErc1155Collection(nftCollection)) {
+      const resp = await sdk.nft.mint({
+        collection: nftCollection,
+        uri: "/ipfs/QmWLsBu6nS4ovaHbGAXprD1qEssJu4r5taQfB74sCG51tp",
+        royalties: [],
+        supply: 1,
+      });
+      tokenId = resp.tokenId;
+    } else {
+      tokenId = "";
+      console.log("Wrong collection");
+    }
+
+    if (tokenId) {
+      /**
+       * Get minted nft through SDK
+       */
+      if (collection.isLazySupported && !collection.isLazy) {
+        await retry(30, async () => {
+          // wait when indexer aggregate an onChain nft
+          await getTokenById(tokenId);
+        });
+      } else {
+        await getTokenById(tokenId);
+      }
+    }
+  };
+
+  const getTokenById = async tokenId => {
+    const token = await sdk.apis.nftItem.getNftItemById({
+      itemId: `0x6ede7f3c26975aad32a475e1021d8f6f39c89d82:${tokenId}`,
+    });
+    if (token) {
+      setCreateOrderForm({
+        ...createOrderForm,
+        contract: token.contract,
+        tokenId: token.tokenId,
+      });
+    }
+  };
+
+  /**
+   * Create sell order from minted nft
+   */
+  const createSellOrder = async () => {
+    if (createOrderForm.contract && createOrderForm.tokenId && createOrderForm.price) {
+      const request = {
+        makeAssetType: {
+          assetClass: collection.type,
+          contract: toAddress(createOrderForm.contract),
+          tokenId: toBigNumber(createOrderForm.tokenId),
+        },
+        amount: 1,
+        maker: toAddress(accounts[0]),
+        originFees: [],
+        payouts: [],
+        price: createOrderForm.price,
+        takeAssetType: { assetClass: "ETH" },
+      };
+      // Create an order
+      const resultOrder = await sdk.order.sell(request).then(a => a.build().runAll());
+      if (resultOrder) {
+        setPurchaseOrderForm({ ...purchaseOrderForm, hash: resultOrder.hash });
+      }
+    }
+  };
+
+  /**
+   * Buy order
+   */
+  const handlePurchaseOrder = async () => {
+    const order = await sdk.apis.order.getOrderByHash({ hash: purchaseOrderForm.hash });
+    if (order) {
+      await sdk.order.fill(order, { amount: parseInt(purchaseOrderForm.amount) }).then(a => a.build().runAll());
+    }
+  };
+
+  /**
+   * Handle get NFT's owned by connected wallet
+   */
+  const handleGetMyNfts = async () => {
+    const items = await sdk.apis.nftItem.getNftItemsByOwner({ owner: accounts[0] });
+    setOwnedItems(items?.items);
+  };
+
+  /**
+   * debounce function for define collection type by collection id(contract address)
+   */
+  const searchType = debounce(async collectionAddress => {
+    if (collectionAddress) {
+      setCollection(prevState => ({ ...prevState, loading: true }));
+      const collectionResponse = await sdk.apis.nftCollection.getNftCollectionById({ collection: collectionAddress });
+      setCollection(prevState => ({
+        ...prevState,
+        type: collectionResponse.type,
+        isLazySupported: collectionResponse.features.includes("MINT_AND_TRANSFER"), // check if it supports lazy minting
+        loading: false,
+      }));
+    }
+  }, 500);
+
+  /**
+   * input handlers
+   */
+  const handleChangeCollection = async e => {
+    const value = e.currentTarget.value;
+    setCollection(prevState => ({ ...prevState, id: value }));
+    if (value) {
+      await searchType(value);
+    }
+  };
+  const handleChangeLazy = e => {
+    setCollection(prevState => ({ ...prevState, isLazy: !prevState.isLazy }));
+  };
+  const handleChangeOrderContract = e => {
+    setCreateOrderForm({ ...createOrderForm, contract: e.currentTarget.value });
+  };
+  const handleChangeOrderTokenId = e => {
+    setCreateOrderForm({ ...createOrderForm, tokenId: e.currentTarget.value });
+  };
+  const handleChangeOrderPrice = e => {
+    setCreateOrderForm({ ...createOrderForm, price: e.currentTarget.value });
+  };
+  const handleOrderHash = e => {
+    setPurchaseOrderForm({ ...purchaseOrderForm, hash: e.currentTarget.value });
+  };
+  const handlePurchaseOrderAmount = e => {
+    setPurchaseOrderForm({ ...createOrderForm, amount: e.currentTarget.value });
+  };
+
+  return (
+    <div className="App">
+      <div>
+        <button onClick={connectWalletHandler} disabled={!!provider?.selectedAddress}>
+          {accounts.length ? "Connected" : "Connect wallet"}
+        </button>
+        {accounts.length && <span>Connected address: {accounts[0]}</span>}
+        <hr />
+        <div style={{ padding: "4px" }}>
+          <p>Mint item form</p>
+          <input onChange={handleChangeCollection} value={collection.id} placeholder="Collection (contract address)" />
+          <p>collection type: {collection.loading ? "..." : collection.type}</p>
+          {collection.isLazySupported && (
+            <p>
+              Lazy?&nbsp;
+              <input type="checkbox" onChange={handleChangeLazy} checked={collection.isLazy} />
+              &nbsp;&nbsp;
+            </p>
+          )}
+          <button onClick={mint}>mint</button>
+        </div>
+        <hr />
+      </div>
+
+      <div style={{ padding: "4px" }}>
+        <p>Create sell order form</p>
+        <input
+          onChange={handleChangeOrderContract}
+          value={createOrderForm?.contract}
+          placeholder={"Contract address"}
+        />
+        <input onChange={handleChangeOrderTokenId} value={createOrderForm?.tokenId} placeholder={"Token Id"} />
+        <input onChange={handleChangeOrderPrice} value={createOrderForm?.price} placeholder={"Price"} />
+        <button onClick={createSellOrder}>Sell</button>
+      </div>
+      <hr />
+      <div style={{ padding: "4px" }}>
+        <p>Purchase created order form</p>
+        <input onChange={handleOrderHash} value={purchaseOrderForm.hash} placeholder={"Order hash"} />
+        <input onChange={handlePurchaseOrderAmount} value={purchaseOrderForm.amount} placeholder={"amount"} />
+        <button onClick={handlePurchaseOrder}>Purchase</button>
+      </div>
+      <hr />
+      <div>
+        <p>
+          NFT items owned by me: <button onClick={handleGetMyNfts}>Refresh</button>
+        </p>
+        <ul>
+          {ownedItems?.length &&
+            ownedItems.map(i => {
+              return (
+                <li key={i.id}>
+                  <p>
+                    <strong>Item</strong> id: {i.id}
+                  </p>
+                  <p>
+                    <strong>Lazy supply:</strong> {i.lazySupply}
+                  </p>
+                </li>
+              );
+            })}
+        </ul>
+      </div>
+    </div>
+  );
+};
+
+function App() {
+  const [provider, setProvider] = useState();
+  const [sdk, setSdk] = useState();
+  const [accounts, setAccounts] = useState([]);
+
+  /**
+   * Initialize SDK
+   */
+  useEffect(() => {
+    if (window.ethereum) {
+      handleInit();
+    } else {
+      window.addEventListener("ethereum#initialized", handleInit, {
+        once: true,
+      });
+      setTimeout(handleInit, 3000); // 3 seconds
+    }
+  }, []);
+
+  // Handle provider and set it to web3
+  function handleInit() {
+    const { ethereum } = window;
+    if (ethereum && ethereum.isMetaMask) {
+      console.log("Ethereum successfully detected!");
+      setProvider(ethereum);
+
+      // add listener on accountsChanged event to render actual address
+      ethereum.on("accountsChanged", setAccounts);
+      // configure web3
+      const web3 = new Web3(ethereum);
+      // configure raribleSdk
+      const raribleSdk = createRaribleSdk(new Web3Ethereum({ web3 }), NETWORK);
+      setSdk(raribleSdk);
+      // set current account if already connected
+      web3.eth.getAccounts().then(e => {
+        setAccounts(e);
+      });
+    } else {
+      console.log("Please install MetaMask!");
+    }
+  }
+
+  if (!provider?.isMetaMask) {
+    return <strong>Please install metamask to use the app</strong>;
+  } else {
+    if (sdk) {
+      return <Dashboard provider={provider} sdk={sdk} accounts={accounts} />;
+    } else {
+      return <strong>Sdk not initialized</strong>;
+    }
+  }
+}
+
+export default App;
+
+// import { SyncOutlined } from "@ant-design/icons";
+// import { utils } from "ethers";
+// import { Button, Card, DatePicker, Divider, Input, List, Progress, Slider, Spin, Switch } from "antd";
+// import React, { useState } from "react";
+// import { Address, Balance } from "../components";
+
+// export default function ExampleUI({
+//   purpose,
+//   setPurposeEvents,
+//   address,
+//   mainnetProvider,
+//   localProvider,
+//   yourLocalBalance,
+//   price,
+//   tx,
+//   readContracts,
+//   writeContracts,
+// }) {
+//   const [newPurpose, setNewPurpose] = useState("loading...");
+
+//   return <div></div>;
+// }
+
+// {/* <div style={{ border: "1px solid #cccccc", padding: 16, width: 400, margin: "auto", marginTop: 64 }}>
+//   <h2>Example UI:</h2>
+//   <h4>purpose: {purpose}</h4>
+//   <Divider />
+//   <div style={{ margin: 8 }}>
+//     <Input
+//       onChange={e => {
+//         setNewPurpose(e.target.value);
+//       }}
+//     />
+//     <Button
+//       style={{ marginTop: 8 }}
+//       onClick={async () => {
+//         /* look how you call setPurpose on your contract: */
+//         /* notice how you pass a call back for tx updates too */
+//         const result = tx(writeContracts.YourContract.setPurpose(newPurpose), update => {
+//           console.log("📡 Transaction Update:", update);
+//           if (update && (update.status === "confirmed" || update.status === 1)) {
+//             console.log(" 🍾 Transaction " + update.hash + " finished!");
+//             console.log(
+//               " ⛽️ " +
+//                 update.gasUsed +
+//                 "/" +
+//                 (update.gasLimit || update.gas) +
+//                 " @ " +
+//                 parseFloat(update.gasPrice) / 1000000000 +
+//                 " gwei",
+//             );
+//           }
+//         });
+//         console.log("awaiting metamask/web3 confirm result...", result);
+//         console.log(await result);
+//       }}
+//     >
+//       Set Purpose!
+//     </Button>
+//   </div>
+//   <Divider />
+//   Your Address:
+//   <Address address={address} ensProvider={mainnetProvider} fontSize={16} />
+//   <Divider />
+//   ENS Address Example:
+//   <Address
+//     address="0x34aA3F359A9D614239015126635CE7732c18fDF3" /* this will show as austingriffith.eth */
+//     ensProvider={mainnetProvider}
+//     fontSize={16}
+//   />
+//   <Divider />
+//   {/* use utils.formatEther to display a BigNumber: */}
+//   <h2>Your Balance: {yourLocalBalance ? utils.formatEther(yourLocalBalance) : "..."}</h2>
+//   <div>OR</div>
+//   <Balance address={address} provider={localProvider} price={price} />
+//   <Divider />
+//   <div>🐳 Example Whale Balance:</div>
+//   <Balance balance={utils.parseEther("1000")} provider={localProvider} price={price} />
+//   <Divider />
+//   {/* use utils.formatEther to display a BigNumber: */}
+//   <h2>Your Balance: {yourLocalBalance ? utils.formatEther(yourLocalBalance) : "..."}</h2>
+//   <Divider />
+//   Your Contract Address:
+//   <Address
+//     address={readContracts && readContracts.YourContract ? readContracts.YourContract.address : null}
+//     ensProvider={mainnetProvider}
+//     fontSize={16}
+//   />
+//   <Divider />
+//   <div style={{ margin: 8 }}>
+//     <Button
+//       onClick={() => {
+//         /* look how you call setPurpose on your contract: */
+//         tx(writeContracts.YourContract.setPurpose("🍻 Cheers"));
+//       }}
+//     >
+//       Set Purpose to &quot;🍻 Cheers&quot;
+//     </Button>
+//   </div>
+//   <div style={{ margin: 8 }}>
+//     <Button
+//       onClick={() => {
+//         /*
+//         you can also just craft a transaction and send it to the tx() transactor
+//         here we are sending value straight to the contract's address:
+//       */
+//         tx({
+//           to: writeContracts.YourContract.address,
+//           value: utils.parseEther("0.001"),
+//         });
+//         /* this should throw an error about "no fallback nor receive function" until you add it */
+//       }}
+//     >
+//       Send Value
+//     </Button>
+//   </div>
+//   <div style={{ margin: 8 }}>
+//     <Button
+//       onClick={() => {
+//         /* look how we call setPurpose AND send some value along */
+//         tx(
+//           writeContracts.YourContract.setPurpose("💵 Paying for this one!", {
+//             value: utils.parseEther("0.001"),
+//           }),
+//         );
+//         /* this will fail until you make the setPurpose function payable */
+//       }}
+//     >
+//       Set Purpose With Value
+//     </Button>
+//   </div>
+//   <div style={{ margin: 8 }}>
+//     <Button
+//       onClick={() => {
+//         /* you can also just craft a transaction and send it to the tx() transactor */
+//         tx({
+//           to: writeContracts.YourContract.address,
+//           value: utils.parseEther("0.001"),
+//           data: writeContracts.YourContract.interface.encodeFunctionData("setPurpose(string)", [
+//             "🤓 Whoa so 1337!",
+//           ]),
+//         });
+//         /* this should throw an error about "no fallback nor receive function" until you add it */
+//       }}
+//     >
+//       Another Example
+//     </Button>
+//   </div>
+// </div>
+
+// {/*
+//   📑 Maybe display a list of events?
+//     (uncomment the event and emit line in YourContract.sol! )
+// */}
+// <div style={{ width: 600, margin: "auto", marginTop: 32, paddingBottom: 32 }}>
+//   <h2>Events:</h2>
+//   <List
+//     bordered
+//     dataSource={setPurposeEvents}
+//     renderItem={item => {
+//       return (
+//         <List.Item key={item.blockNumber + "_" + item.sender + "_" + item.purpose}>
+//           <Address address={item[0]} ensProvider={mainnetProvider} fontSize={16} />
+//           {item[1]}
+//         </List.Item>
+//       );
+//     }}
+//   />
+// </div>
+
+// <div style={{ width: 600, margin: "auto", marginTop: 32, paddingBottom: 256 }}>
+//   <Card>
+//     Check out all the{" "}
+//     <a
+//       href="https://github.com/austintgriffith/scaffold-eth/tree/master/packages/react-app/src/components"
+//       target="_blank"
+//       rel="noopener noreferrer"
+//     >
+//       📦 components
+//     </a>
+//   </Card>
+
+//   <Card style={{ marginTop: 32 }}>
+//     <div>
+//       There are tons of generic components included from{" "}
+//       <a href="https://ant.design/components/overview/" target="_blank" rel="noopener noreferrer">
+//         🐜 ant.design
+//       </a>{" "}
+//       too!
+//     </div>
+
+//     <div style={{ marginTop: 8 }}>
+//       <Button type="primary">Buttons</Button>
+//     </div>
+
+//     <div style={{ marginTop: 8 }}>
+//       <SyncOutlined spin /> Icons
+//     </div>
+
+//     <div style={{ marginTop: 8 }}>
+//       Date Pickers?
+//       <div style={{ marginTop: 2 }}>
+//         <DatePicker onChange={() => {}} />
+//       </div>
+//     </div>
+
+//     <div style={{ marginTop: 32 }}>
+//       <Slider range defaultValue={[20, 50]} onChange={() => {}} />
+//     </div>
+
+//     <div style={{ marginTop: 32 }}>
+//       <Switch defaultChecked onChange={() => {}} />
+//     </div>
+
+//     <div style={{ marginTop: 32 }}>
+//       <Progress percent={50} status="active" />
+//     </div>
+
+//     <div style={{ marginTop: 32 }}>
+//       <Spin />
+//     </div>
+//   </Card>
+// </div> */}
