@@ -6,6 +6,13 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
+interface CETH {
+    function mint() external payable;
+    function redeem(uint redeemTokens) external returns (uint);
+    function exchangeRateStored() public view returns (uint);
+    function balanceOf(address owner) external view returns (uint256);
+
+}
 struct StakedData {
     address user;
     uint256 timestamp;
@@ -30,6 +37,7 @@ contract WenPassiveIncomeProtocol {
     );
 
     IERC721 public token;
+    ICETH public ceth;
     using Counters for Counters.Counter;
     Counters.Counter public stakedCount;
     mapping(uint256 => StakedData) public staked; // mapping of tokenId to (user/timestamp)
@@ -118,6 +126,11 @@ contract WenPassiveIncomeProtocol {
     function setToken(IERC721 token_) external {
         token = token_;
         emit SetToken(address(token_));
+    }
+
+    function setCeth(ICETH token_) external {
+        ceth = token_;
+        // emit SetToken(address(token_));
     }
 
     function borrow(uint256 tokenId, uint256 loanAmount) external {

@@ -57,6 +57,7 @@ export default function Contract({
   contractConfig,
 }) {
   const contracts = useContractLoader(provider, contractConfig, chainId);
+  console.log("contracts", contracts);
   let contract;
   if (!customContract) {
     contract = contracts ? contracts[name] : "";
@@ -66,6 +67,7 @@ export default function Contract({
 
   const address = contract ? contract.address : "";
   const contractIsDeployed = useContractExistsAtAddress(provider, address);
+  console.log("contractIsDeployed", contractIsDeployed);
 
   const displayedContractFunctions = useMemo(() => {
     const results = contract

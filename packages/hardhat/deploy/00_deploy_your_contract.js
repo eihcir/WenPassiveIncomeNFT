@@ -4,18 +4,19 @@ const { ethers } = require("hardhat");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deploy } = deployments;
-  const { deployer } = await getNamedAccounts();
+  // const { deployer } = await getNamedAccounts();
+  const deployer = "0xE7aa7AF667016837733F3CA3809bdE04697730eF";
   await deploy("WenPassiveIncomeProtocol", {
     // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
     from: deployer,
-    value: ethers.utils.parseEther("100"),
+    // value: ethers.utils.parseEther("100"),
     // args: ["Hello Amigos"],
     log: true,
   });
   await deploy("WenPassiveIncomeNFT", {
     // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
     from: deployer,
-    value: ethers.utils.parseEther("5"),
+    // value: ethers.utils.parseEther("5"),
     // args: ["Hello Amigos123"],
     log: true,
   });

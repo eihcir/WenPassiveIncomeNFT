@@ -6,5 +6,9 @@ export const loadAppContracts = async () => {
   const config = {};
   config.deployedContracts = (await contractListPromise).default ?? {};
   config.externalContracts = (await externalContractsPromise).default ?? {};
+  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  console.log(config);
   return config;
 };
