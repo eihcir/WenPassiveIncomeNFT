@@ -6,25 +6,6 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-interface ICETH {
-    function mint() external payable;
-
-    function redeem(uint256 redeemTokens) external returns (uint256);
-
-    function exchangeRateStored() external view returns (uint256);
-
-    function balanceOf(address owner) external view returns (uint256);
-}
-struct StakedData {
-    address user;
-    uint256 timestamp;
-}
-
-struct LoanData {
-    address user;
-    uint256 timestamp;
-    uint256 owed;
-}
 //   /$$      /$$
 //  | $$  /$ | $$
 //  | $$ /$$$| $$  /$$$$$$  /$$$$$$$
@@ -57,6 +38,27 @@ struct LoanData {
 //  |______/|__/  |__/ \_______/ \______/ |__/ |__/ |__/ \_______/ |__/
 //
 //
+
+interface ICETH {
+    function mint() external payable;
+
+    function redeem(uint256 redeemTokens) external returns (uint256);
+
+    function exchangeRateStored() external view returns (uint256);
+
+    function balanceOf(address owner) external view returns (uint256);
+}
+struct StakedData {
+    address user;
+    uint256 timestamp;
+}
+
+struct LoanData {
+    address user;
+    uint256 timestamp;
+    uint256 owed;
+}
+
 //@Notice Protocol for adding staking or lending to a NFT collection
 contract WenPassiveIncomeProtocol {
     event SetToken(address indexed token);
@@ -76,8 +78,6 @@ contract WenPassiveIncomeProtocol {
 
     IERC721 public token;
     ICETH public vaultToken;
-    // using Counters for Counters.Counter;
-    // Counters.Counter public stakedCount;
     mapping(uint256 => StakedData) public staked; // mapping of tokenId to (user/timestamp)
     uint256[] public rewardTimes; //array of times rewards are claimable
     uint256[] public rewardAmounts; //array of reward amounts
@@ -105,13 +105,13 @@ contract WenPassiveIncomeProtocol {
         emit EthReceived(msg.value, msg.sender);
     }
 
-
     receive() external payable {
         if (msg.value > 10000000000000000) {
-            (bool success, ) = address(vaultToken).call{value: (msg.value - 10000000000000000), gas: 1000000}(
-                abi.encodeWithSignature("mint()")
-            );
-            require(success, "Failed to depsit");
+            (bool success, ) = address(vaultToken).call{
+                value: (msg.value - 10000000000000000),
+                gas: 1000000
+            }(abi.encodeWithSignature("mint()"));
+            require(success, "Failed to deposit");
         }
 
         emit EthReceived(msg.value, msg.sender);
@@ -122,7 +122,6 @@ contract WenPassiveIncomeProtocol {
             abi.encodeWithSignature("mint()")
         );
         require(success, "Failed to depsit");
-        // ,{"constant":false,"inputs":[],"name":"mint","outputs":[],"payable":true,"stateMutability":"payable","type":"function"}
     }
 
     function stake(uint256 tokenId) external {
@@ -139,6 +138,10 @@ contract WenPassiveIncomeProtocol {
         emit Staked(tokenId, msg.sender);
     }
 
+    function transfer(uint256 tokenId, address guy) external {
+        token.safeTransferFrom(address(this), guy, tokenId);
+    }
+
     function _unstake(uint256 tokenId) internal {
         // stakedCount.decrement();
         staked[tokenId] = StakedData(address(0), 0);
@@ -147,7 +150,7 @@ contract WenPassiveIncomeProtocol {
         emit Unstaked(tokenId, msg.sender);
     }
 
-    function claimRewardsAndUnstake(uint256 tokenId) external {
+    function claimRewards(uint256 tokenId, bool and_unstake) internal {
         require(staked[tokenId].user == msg.sender, "Unauthorized");
         // TODO: Include arrays in calldata
         uint256[] memory rewardAmounts_ = rewardAmounts; // change to callData later with UI
@@ -162,14 +165,18 @@ contract WenPassiveIncomeProtocol {
         //     "Invalid"
         // );
 
-        _unstake(tokenId);
-
         StakedData memory stakedData = staked[tokenId];
         uint256 totalRewards = 0;
         for (uint256 idx = 0; idx < rewardTimes_.length; idx++) {
             if (rewardTimes_[idx] >= stakedData.timestamp) {
                 totalRewards += rewardAmounts_[idx];
             }
+        }
+
+        if (and_unstake) {
+            _unstake(tokenId);
+        } else {
+            staked[tokenId] = StakedData(msg.sender, block.timestamp);
         }
 
         (bool success, ) = msg.sender.call{value: totalRewards}("");

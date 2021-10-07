@@ -30,9 +30,10 @@ import Authereum from "authereum";
 import { createRaribleSdk } from "@rarible/protocol-ethereum-sdk";
 
 const { ethers } = require("ethers");
-const sdk = createRaribleSdk(ethers, "ropsten");
+const sdk = createRaribleSdk(ethers, "rinkeby");
 
-const compoundAddress = "0x859e9d8a4edadfedb5a2ff311243af80f85a91b8";
+const compoundAddress = "0xd6801a1dffcd0a410336ef88def4320d6df1883e";
+const me = "0xE7aa7AF667016837733F3CA3809bdE04697730eF".toLowerCase();
 
 /*
     Welcome to 🏗 scaffold-eth !
@@ -54,7 +55,7 @@ const compoundAddress = "0x859e9d8a4edadfedb5a2ff311243af80f85a91b8";
 */
 
 /// 📡 What chain are your contracts deployed to?
-const targetNetwork = NETWORKS.ropsten; // <------- select your target frontend network (localhost, rinkeby, xdai, mainnet)
+const targetNetwork = NETWORKS.rinkeby; // <------- select your target frontend network (localhost, rinkeby, xdai, mainnet)
 
 // 😬 Sorry for all the console logging
 const DEBUG = true;
@@ -450,6 +451,8 @@ function App(props) {
   }
 
   console.log("mainnetContracts", mainnetContracts);
+  const rinkebyContracts = useContractLoader(localProvider, contractConfig);
+  console.log("rinkebyContracts", rinkebyContracts);
 
   return (
     <div className="App">
@@ -488,17 +491,17 @@ function App(props) {
               ExampleUI
             </Link>
           </Menu.Item>
-          {/* <Menu.Item key="/ropstenceth">
+          <Menu.Item key="/rarible">
             <Link
               onClick={() => {
-                setRoute("/ropstenceth");
+                setRoute("/rarible");
               }}
-              to="/ropstenceth"
+              to="/rarible"
             >
-              ropsten cETH
+              WenPassiveIncomeNftRarible
             </Link>
           </Menu.Item>
-          <Menu.Item key="/subgraph">
+          {/*<Menu.Item key="/subgraph">
             <Link
               onClick={() => {
                 setRoute("/subgraph");
@@ -562,26 +565,26 @@ function App(props) {
           </Route>
           {/* <Route path="/ropstenceth">
             <Contract
-              name="cETH"
-              customContract={mainnetContracts && mainnetContracts.contracts && mainnetContracts.contracts.CETH}
-              signer={userSigner}
-              provider={mainnetProvider}
-              address={address}
-              blockExplorer={blockExplorer}
-              contractConfig={contractConfig}
-              chainId={3}
-            /> */}
-          {/*
+            name="cETH"
+            customContract={mainnetContracts && mainnetContracts.contracts && mainnetContracts.contracts.CETH}
+            signer={userSigner}
+            provider={mainnetProvider}
+            address={address}
+            blockExplorer={blockExplorer}
+            contractConfig={contractConfig}
+            chainId={3}
+          /> */}
+
+          <Route path="/rarible">
             <Contract
-              name="UNI"
-              customContract={mainnetContracts && mainnetContracts.contracts && mainnetContracts.contracts.UNI}
+              name="WenPassiveIncomeNFTRarible"
+              customContract={rinkebyContracts && rinkebyContracts.WenPassiveIncomeNFTRarible}
               signer={userSigner}
-              provider={mainnetProvider}
-              address={address}
-              blockExplorer="https://etherscan.io/"
+              provider={localProvider}
+              address={me}
+              blockExplorer="https://rinkeby.etherscan.io/"
             />
-            */}
-          {/* </Route> */}
+          </Route>
           {/* <Route path="/subgraph">
             <Subgraph
               subgraphUri={props.subgraphUri}

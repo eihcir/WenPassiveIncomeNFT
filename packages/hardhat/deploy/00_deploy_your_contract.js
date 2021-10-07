@@ -5,6 +5,7 @@ const { ethers } = require("hardhat");
 module.exports = async ({ getNamedAccounts, deployments }) => {
   const { deploy } = deployments;
   // const { deployer } = await getNamedAccounts();
+  console.log("here");
   const deployer = "0xE7aa7AF667016837733F3CA3809bdE04697730eF";
   await deploy("WenPassiveIncomeProtocol", {
     // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
@@ -29,7 +30,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   );
 
   await protocol.setToken(token.address);
-  await protocol.setVaultToken("0x859e9d8a4edadfedb5a2ff311243af80f85a91b8");
+  // await protocol.setVaultToken("0x859e9d8a4edadfedb5a2ff311243af80f85a91b8");
   /*
     // Getting a previously deployed contract
 
