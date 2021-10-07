@@ -22,15 +22,15 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log: true,
   });
 
-  const token = await ethers.getContract("WenPassiveIncomeNFT", deployer);
+  // const token = await ethers.getContract("WenPassiveIncomeNFT", deployer);
 
   const protocol = await ethers.getContract(
     "WenPassiveIncomeProtocol",
     deployer
   );
 
-  await protocol.setToken(token.address);
-  // await protocol.setVaultToken("0x859e9d8a4edadfedb5a2ff311243af80f85a91b8");
+  await protocol.setToken("0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117");
+  await protocol.setVaultToken("0xd6801a1dffcd0a410336ef88def4320d6df1883e");
   /*
     // Getting a previously deployed contract
 

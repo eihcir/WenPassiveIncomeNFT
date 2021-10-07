@@ -61,7 +61,8 @@ struct LoanData {
 
 //@Notice Protocol for adding staking or lending to a NFT collection
 contract WenPassiveIncomeProtocol {
-    event SetToken(address indexed token);
+    event SetErc721Token(address indexed token);
+    event SetVaultToken(address indexed token);
     event Loaned(
         uint256 indexed tokenId,
         address indexed guy,
@@ -105,18 +106,22 @@ contract WenPassiveIncomeProtocol {
         emit EthReceived(msg.value, msg.sender);
     }
 
+    //notice: Automatically deposits any excess over minimum reserves
     receive() external payable {
-        if (msg.value > 10000000000000000) {
-            (bool success, ) = address(vaultToken).call{
-                value: (msg.value - 10000000000000000),
-                gas: 1000000
-            }(abi.encodeWithSignature("mint()"));
-            require(success, "Failed to deposit");
+        uint256 minimumReserves = 1e18;
+        if (address(this).balance > minimumReserves) {
+            uint256 amountOut = msg.value + address(this).balance - minimumReserves;
+            deposit(amountOut);
+            // (bool success, ) = address(vaultToken).call{
+            //     value: amountOut,
+            //     gas: 1000000
+            // }(abi.encodeWithSignature("mint()"));
+            // require(success, "Failed to deposit");
         }
-
         emit EthReceived(msg.value, msg.sender);
     }
 
+    //@notice Deposit in vault, receive vault tokens
     function deposit(uint256 value) public {
         (bool success, ) = address(vaultToken).call{value: value, gas: 1000000}(
             abi.encodeWithSignature("mint()")
@@ -124,6 +129,7 @@ contract WenPassiveIncomeProtocol {
         require(success, "Failed to depsit");
     }
 
+    //@notice ApproveAll required
     function stake(uint256 tokenId) external {
         require(token.ownerOf(tokenId) == msg.sender, "Not owned");
         require(
@@ -138,18 +144,23 @@ contract WenPassiveIncomeProtocol {
         emit Staked(tokenId, msg.sender);
     }
 
+    //@notice Useful for transferring liquidated NFTs
     function transfer(uint256 tokenId, address guy) external {
         token.safeTransferFrom(address(this), guy, tokenId);
     }
 
     function _unstake(uint256 tokenId) internal {
-        // stakedCount.decrement();
         staked[tokenId] = StakedData(address(0), 0);
         token.approve(msg.sender, tokenId);
         token.safeTransferFrom(address(this), msg.sender, tokenId);
         emit Unstaked(tokenId, msg.sender);
     }
 
+    //@notice Used to claim rewards and optionally unstake
+    //@notice If and_unstake==False, update stake timestamp
+    //@param tokenId Id of token to claim rewards for
+    //@param and_unstake Set to true if returning NFT to owner
+    //@dev Explain hash
     function claimRewards(uint256 tokenId, bool and_unstake) internal {
         require(staked[tokenId].user == msg.sender, "Unauthorized");
         // TODO: Include arrays in calldata
@@ -184,6 +195,9 @@ contract WenPassiveIncomeProtocol {
         emit RewardsClaimed(tokenId, msg.sender, totalRewards);
     }
 
+    //@notice Used by admin to set reward
+    //@param amount Represents amount of eth PER STAKED ADDRESS
+    //@dev RewardsAmounts and Times hashes updated
     function addReward(uint256 amount) external {
         rewardAmounts.push(amount);
         rewardTimes.push(block.timestamp);
@@ -192,15 +206,25 @@ contract WenPassiveIncomeProtocol {
         //emit RewardAdded
     }
 
-    function setToken(IERC721 token_) external {
-        token = token_;
-        emit SetToken(address(token_));
+
+    //@notice Used by admin to set ERC721 token
+    //@param Address of token
+    //@dev This should only be set once
+    //@dev RewardsAmounts and Times hashes updated
+    function setErc721Token(address token_) external {
+        require(token_ == address(0), "Already set");
+        token = IERC721(token_);
+        emit SetErc721Token(token_);
     }
 
+    //@notice Used by admin to set Vault contract for use with deposits
+    //@param Address of vault
+    //@dev Becareful if changing this, redeem Vault deposits first
     function setVaultToken(ICETH token_) external {
         vaultToken = token_;
-        // emit SetVaultToken(address(token_));
+        emit SetVaultToken(address(token_));
     }
+
 
     function borrow(uint256 tokenId, uint256 loanAmount) external {
         require(token.ownerOf(tokenId) == msg.sender, "Not owned");

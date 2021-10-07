@@ -57,6 +57,7 @@ export default function ExampleUI({ sdk, readContracts, writeContracts }) {
       if (owners.includes(me)) {
         console.log("OWNEEEEEEEEEEEEEEEEEEEEEEEEEEDDDD!!!!!!!!!", item.tokenId);
         item.status = "owned";
+        items[item.tokenId] = item;
       } else if (owners.includes(protoAddy)) {
         console.log("itemid", item.tokenId);
         console.log("big", convertBig(item.tokenId));
@@ -65,14 +66,15 @@ export default function ExampleUI({ sdk, readContracts, writeContracts }) {
         console.log("staked", item, staked[0].toLowerCase());
         if (staked[0].toLowerCase() == me) {
           item.status = "staked";
+          items[item.tokenId] = item;
         }
         const loaned = await readContracts.WenPassiveIncomeProtocol.loaned(convertBig(item.tokenId));
         console.log("loaned", item, loaned[0].toLowerCase());
         if (loaned[0].toLowerCase() == me) {
           item.status = "staked";
+          items[item.tokenId] = item;
         }
       }
-      items[item.tokenId] = item;
     }
     console.log("done yo!!!!!!!!!!!!!!!!!!!!!!");
     setLoaded(true);
