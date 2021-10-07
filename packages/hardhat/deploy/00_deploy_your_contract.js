@@ -29,6 +29,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   );
 
   await protocol.setToken(token.address);
+  await protocol.setVaultToken("0x859e9d8a4edadfedb5a2ff311243af80f85a91b8");
   /*
     // Getting a previously deployed contract
 

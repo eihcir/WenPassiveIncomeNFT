@@ -6,12 +6,14 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-interface CETH {
+interface ICETH {
     function mint() external payable;
-    function redeem(uint redeemTokens) external returns (uint);
-    function exchangeRateStored() public view returns (uint);
-    function balanceOf(address owner) external view returns (uint256);
 
+    function redeem(uint256 redeemTokens) external returns (uint256);
+
+    function exchangeRateStored() external view returns (uint256);
+
+    function balanceOf(address owner) external view returns (uint256);
 }
 struct StakedData {
     address user;
@@ -23,11 +25,47 @@ struct LoanData {
     uint256 timestamp;
     uint256 owed;
 }
-
+//   /$$      /$$
+//  | $$  /$ | $$
+//  | $$ /$$$| $$  /$$$$$$  /$$$$$$$
+//  | $$/$$ $$ $$ /$$__  $$| $$__  $$
+//  | $$$$_  $$$$| $$$$$$$$| $$  \ $$
+//  | $$$/ \  $$$| $$_____/| $$  | $$
+//  | $$/   \  $$|  $$$$$$$| $$  | $$
+//  |__/     \__/ \_______/|__/  |__/
+//
+//
+//
+//   /$$$$$$$                              /$$
+//  | $$__  $$                            |__/
+//  | $$  \ $$ /$$$$$$   /$$$$$$$ /$$$$$$$ /$$ /$$    /$$ /$$$$$$
+//  | $$$$$$$/|____  $$ /$$_____//$$_____/| $$|  $$  /$$//$$__  $$
+//  | $$____/  /$$$$$$$|  $$$$$$|  $$$$$$ | $$ \  $$/$$/| $$$$$$$$
+//  | $$      /$$__  $$ \____  $$\____  $$| $$  \  $$$/ | $$_____/
+//  | $$     |  $$$$$$$ /$$$$$$$//$$$$$$$/| $$   \  $/  |  $$$$$$$
+//  |__/      \_______/|_______/|_______/ |__/    \_/    \_______/
+//
+//
+//
+//   /$$$$$$                                                       /$$$$
+//  |_  $$_/                                                      /$$  $$
+//    | $$   /$$$$$$$   /$$$$$$$  /$$$$$$  /$$$$$$/$$$$   /$$$$$$|__/\ $$
+//    | $$  | $$__  $$ /$$_____/ /$$__  $$| $$_  $$_  $$ /$$__  $$   /$$/
+//    | $$  | $$  \ $$| $$      | $$  \ $$| $$ \ $$ \ $$| $$$$$$$$  /$$/
+//    | $$  | $$  | $$| $$      | $$  | $$| $$ | $$ | $$| $$_____/ |__/
+//   /$$$$$$| $$  | $$|  $$$$$$$|  $$$$$$/| $$ | $$ | $$|  $$$$$$$  /$$
+//  |______/|__/  |__/ \_______/ \______/ |__/ |__/ |__/ \_______/ |__/
+//
+//
 //@Notice Protocol for adding staking or lending to a NFT collection
 contract WenPassiveIncomeProtocol {
     event SetToken(address indexed token);
-    event Loaned(uint256 indexed tokenId, address indexed guy, uint256 loanAmount);
+    event Loaned(
+        uint256 indexed tokenId,
+        address indexed guy,
+        uint256 loanAmount
+    );
+    event EthReceived(uint256 amount, address indexed guy);
     event Staked(uint256 indexed tokenId, address indexed guy);
     event Unstaked(uint256 indexed tokenId, address indexed guy);
     event RewardsClaimed(
@@ -37,14 +75,14 @@ contract WenPassiveIncomeProtocol {
     );
 
     IERC721 public token;
-    ICETH public ceth;
-    using Counters for Counters.Counter;
-    Counters.Counter public stakedCount;
+    ICETH public vaultToken;
+    // using Counters for Counters.Counter;
+    // Counters.Counter public stakedCount;
     mapping(uint256 => StakedData) public staked; // mapping of tokenId to (user/timestamp)
     uint256[] public rewardTimes; //array of times rewards are claimable
     uint256[] public rewardAmounts; //array of reward amounts
-    bytes32 public rewardAmountsHash;
-    bytes32 public rewardTimesHash;
+    // bytes32 public rewardAmountsHash;
+    // bytes32 public rewardTimesHash;1
 
     mapping(uint256 => LoanData) public loaned; // mapping of tokenId to (user/amount/timestamp)
 
@@ -63,6 +101,30 @@ contract WenPassiveIncomeProtocol {
         return this.onERC721Received.selector;
     }
 
+    function receiveFunds() external payable {
+        emit EthReceived(msg.value, msg.sender);
+    }
+
+
+    receive() external payable {
+        if (msg.value > 10000000000000000) {
+            (bool success, ) = address(vaultToken).call{value: (msg.value - 10000000000000000), gas: 1000000}(
+                abi.encodeWithSignature("mint()")
+            );
+            require(success, "Failed to depsit");
+        }
+
+        emit EthReceived(msg.value, msg.sender);
+    }
+
+    function deposit(uint256 value) public {
+        (bool success, ) = address(vaultToken).call{value: value, gas: 1000000}(
+            abi.encodeWithSignature("mint()")
+        );
+        require(success, "Failed to depsit");
+        // ,{"constant":false,"inputs":[],"name":"mint","outputs":[],"payable":true,"stateMutability":"payable","type":"function"}
+    }
+
     function stake(uint256 tokenId) external {
         require(token.ownerOf(tokenId) == msg.sender, "Not owned");
         require(
@@ -71,14 +133,14 @@ contract WenPassiveIncomeProtocol {
         );
 
         staked[tokenId] = StakedData(msg.sender, block.timestamp);
-        stakedCount.increment();
+        // stakedCount.increment();
 
         token.safeTransferFrom(msg.sender, address(this), tokenId);
         emit Staked(tokenId, msg.sender);
     }
 
     function _unstake(uint256 tokenId) internal {
-        stakedCount.decrement();
+        // stakedCount.decrement();
         staked[tokenId] = StakedData(address(0), 0);
         token.approve(msg.sender, tokenId);
         token.safeTransferFrom(address(this), msg.sender, tokenId);
@@ -91,14 +153,14 @@ contract WenPassiveIncomeProtocol {
         uint256[] memory rewardAmounts_ = rewardAmounts; // change to callData later with UI
         uint256[] memory rewardTimes_ = rewardTimes;
         require(rewardAmounts_.length == rewardTimes_.length);
-        require(
-            keccak256(abi.encode(rewardAmounts_)) == rewardAmountsHash,
-            "Invalid"
-        );
-        require(
-            keccak256(abi.encode(rewardTimes_)) == rewardTimesHash,
-            "Invalid"
-        );
+        // require(
+        //     keccak256(abi.encode(rewardAmounts_)) == rewardAmountsHash,
+        //     "Invalid"
+        // );
+        // require(
+        //     keccak256(abi.encode(rewardTimes_)) == rewardTimesHash,
+        //     "Invalid"
+        // );
 
         _unstake(tokenId);
 
@@ -118,8 +180,8 @@ contract WenPassiveIncomeProtocol {
     function addReward(uint256 amount) external {
         rewardAmounts.push(amount);
         rewardTimes.push(block.timestamp);
-        rewardAmountsHash = keccak256(abi.encode(rewardAmounts));
-        rewardTimesHash = keccak256(abi.encode(rewardTimes));
+        // rewardAmountsHash = keccak256(abi.encode(rewardAmounts));
+        // rewardTimesHash = keccak256(abi.encode(rewardTimes));
         //emit RewardAdded
     }
 
@@ -128,9 +190,9 @@ contract WenPassiveIncomeProtocol {
         emit SetToken(address(token_));
     }
 
-    function setCeth(ICETH token_) external {
-        ceth = token_;
-        // emit SetToken(address(token_));
+    function setVaultToken(ICETH token_) external {
+        vaultToken = token_;
+        // emit SetVaultToken(address(token_));
     }
 
     function borrow(uint256 tokenId, uint256 loanAmount) external {
