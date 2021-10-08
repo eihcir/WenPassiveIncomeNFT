@@ -84,7 +84,9 @@ export default function ExampleUI({ sdk, readContracts, writeContracts }) {
   }
 
   async function stake(tokenId) {
-    await writeContracts.WenPassiveIncomeProtocol.stake(convertBig(tokenId));
+    await writeContracts.WenPassiveIncomeProtocol.stake(convertBig(tokenId), {
+      gasLimit: 20000000,
+    });
     setAllItems({
       ...allItems,
       [tokenId]: {
@@ -93,8 +95,22 @@ export default function ExampleUI({ sdk, readContracts, writeContracts }) {
       },
     });
   }
-  async function unstake(tokenId) {
-    await writeContracts.WenPassiveIncomeProtocol.claimRewardsAndUnstake(convertBig(tokenId));
+  async function claimRewardsAndUnstake(tokenId) {
+    await writeContracts.WenPassiveIncomeProtocol.claimRewards(convertBig(tokenId), true, {
+      gasLimit: 20000000,
+    });
+    setAllItems({
+      ...allItems,
+      [tokenId]: {
+        ...allItems[tokenId],
+        status: "owned",
+      },
+    });
+  }
+  async function claimRewards(tokenId) {
+    await writeContracts.WenPassiveIncomeProtocol.claimRewards(convertBig(tokenId), false, {
+      gasLimit: 20000000,
+    });
     setAllItems({
       ...allItems,
       [tokenId]: {
@@ -144,7 +160,8 @@ export default function ExampleUI({ sdk, readContracts, writeContracts }) {
     const buttons = [];
     switch (item.status) {
       case "staked":
-        buttons.push(<button onClick={() => unstake(item.tokenId)}>UNSTAKE</button>);
+        buttons.push(<button onClick={() => claimRewardsAndUnstake(item.tokenId)}>CLAIM REWARDS AND UNSTAKE</button>);
+        buttons.push(<button onClick={() => claimRewards(item.tokenId)}>CLAIM REWARDS</button>);
         break;
 
       case "owned":

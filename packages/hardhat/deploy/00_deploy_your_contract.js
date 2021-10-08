@@ -3,22 +3,24 @@
 const { ethers } = require("hardhat");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
+  const erc721Token = "0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117";
   const { deploy } = deployments;
   // const { deployer } = await getNamedAccounts();
-  console.log("here");
   const deployer = "0xE7aa7AF667016837733F3CA3809bdE04697730eF";
+  console.log("here");
+  // await deploy("WenPassiveIncomeNFT", {
+  // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
+  // from: deployer,
+  // value: ethers.utils.parseEther("5"),
+  // args: ["Hello Amigos123"],
+  //   log: true,
+  // });
+  // const nft = await ethers.getContract("WenPassiveIncomeNFT", deployer);
   await deploy("WenPassiveIncomeProtocol", {
     // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
     from: deployer,
     // value: ethers.utils.parseEther("100"),
-    // args: ["Hello Amigos"],
-    log: true,
-  });
-  await deploy("WenPassiveIncomeNFT", {
-    // Learn more about args here: https://www.npmjs.com/package/hardhat-deploy#deploymentsdeploy
-    from: deployer,
-    // value: ethers.utils.parseEther("5"),
-    // args: ["Hello Amigos123"],
+    args: [erc721Token],
     log: true,
   });
 
@@ -29,7 +31,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     deployer
   );
 
-  await protocol.setToken("0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117");
+  // await protocol.setErc721Token("0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117");
   await protocol.setVaultToken("0xd6801a1dffcd0a410336ef88def4320d6df1883e");
   /*
     // Getting a previously deployed contract
