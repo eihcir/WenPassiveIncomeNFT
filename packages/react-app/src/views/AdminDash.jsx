@@ -4,11 +4,40 @@ import { Button, Card, DatePicker, Divider, Input, List, Progress, Slider, Spin,
 import React, { useState } from "react";
 import { Address, Balance } from "../components";
 
+import axios from "axios";
 const me = "0xE7aa7AF667016837733F3CA3809bdE04697730eF".toLowerCase();
 const nftAddy = "0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117".toLowerCase();
 const convertBig = x => ethers.utils.hexlify(ethers.BigNumber.from(x.toString()));
 
-export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) {
+const data = {
+  type: "RARIBLE_V2",
+  maker: me,
+  make: {
+    assetType: {
+      assetClass: "ERC721",
+      contract: nftAddy,
+      tokenId: 6,
+    },
+    value: "1",
+  },
+  take: {
+    assetType: {
+      assetClass: "ETH",
+    },
+    value: "1000000000000000000",
+  },
+  data: {
+    dataType: "RARIBLE_V2_DATA_V1",
+    payouts: [],
+    originFees: [],
+  },
+  salt: 1234,
+};
+
+axios.post("https://api-staging.rarible.com/protocol/v0.1/ethereum/order/encoder/order", data).then(res => {
+  console.log("reeeeeeeeeeeeeeeeeeees", res);
+});
+export default function AdminDash({ sdk, readContracts, writeContracts, localProvider, price }) {
   // const [newPurpose, setNewPurpose] = useState("loading...");
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,14 +76,10 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
       } else if (owners.includes(protoAddy)) {
         const staked = await readContracts.WenPassiveIncomeProtocol.staked(convertBig(item.tokenId));
         if (staked[0].toLowerCase() == me) {
-          console.log("staked", staked);
           item.status = "staked";
           items[item.tokenId] = item;
         }
         const loaned = await readContracts.WenPassiveIncomeProtocol.loaned(convertBig(item.tokenId));
-        console.log("loaned", loaned);
-        console.log("amount", ethers.BigNumber.from(loaned[1]).toString());
-        console.log("amountEth", ethers.utils.parseEther(ethers.BigNumber.from(loaned[1]).toString()).toString());
         if (loaned[0].toLowerCase() == me) {
           item.status = "loaned";
           items[item.tokenId] = item;
@@ -104,10 +129,9 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
     });
   }
 
-  async function borrow(tokenId, value) {
-    console.log(tokenId, value);
-    await writeContracts.WenPassiveIncomeProtocol.borrow(convertBig(tokenId), ethers.utils.parseEther(value), {
-      gasLimit: 2000000,
+  async function borrow(tokenId) {
+    await writeContracts.WenPassiveIncomeProtocol.borrow(convertBig(tokenId), ethers.utils.parseEther("0.1"), {
+      gasLimit: 20000000,
     });
     setAllItems({
       ...allItems,
@@ -118,10 +142,10 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
     });
   }
 
-  async function repay(tokenId, value) {
+  async function repay(tokenId) {
     await writeContracts.WenPassiveIncomeProtocol.repay(convertBig(tokenId), {
-      gasLimit: 2000000,
-      value: ethers.utils.parseEther(value),
+      gasLimit: 20000000,
+      value: ethers.utils.parseEther("0.1"),
     });
     setAllItems({
       ...allItems,
@@ -131,6 +155,31 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
       },
     });
   }
+
+  /**
+   * Create sell order from minted nft
+   */
+  const createSellOrder = async tokenId => {
+    const request = {
+      makeAssetType: {
+        assetClass: "ERC721",
+        contract: nftAddy,
+        tokenId: convertBig(tokenId),
+      },
+      amount: 1,
+      maker: me,
+      originFees: [],
+      payouts: [],
+      price: ethers.utils.parseEther("0.1"),
+      takeAssetType: { assetClass: "ETH" },
+    };
+    console.log(request);
+    // Create an order
+    const resultOrder = await sdk.order.sell(request);
+    // const resultOrder = await sdk.order.sell(request).then(a => a.build().runAll());
+    console.log(resultOrder);
+  };
+
   const NFTDisplay = ({ item }) => (
     <div style={{}}>
       <img src={item.image.url.PREVIEW} />
@@ -139,28 +188,6 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
       </h1>
     </div>
   );
-
-  const NumericInputButton = ({ action, label, tokenId }) => {
-    const [value, setValue] = useState("0.1");
-    const [pressed, setPressed] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
-    const handleClick = () => setPressed(true);
-    const handleChange = e => setValue(e.target.value);
-    const handleKeyPress = e => {
-      if (e.key === "Enter") {
-        setSubmitted(true);
-        action(tokenId, value);
-      }
-    };
-    if (submitted) return <button>Confirming...</button>;
-    if (pressed)
-      return (
-        <button>
-          <input type="text" onChange={e => setValue(e.target.value)} value={value} onKeyPress={handleKeyPress} />
-        </button>
-      );
-    return <button onClick={handleClick}>{label}</button>;
-  };
 
   const Buttons = ({ item }) => {
     const buttons = [];
@@ -172,12 +199,12 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
 
       case "owned":
         buttons.push(<button onClick={() => stake(item.tokenId)}>STAKE</button>);
-        // buttons.push(<button onClick={() => borrow(item.tokenId)}>BORROW</button>);
-        buttons.push(<NumericInputButton label="BORROW" action={borrow} tokenId={item.tokenId} />);
+        buttons.push(<button onClick={() => borrow(item.tokenId)}>BORROW</button>);
+        buttons.push(<button onClick={() => createSellOrder(item.tokenId)}>SELL</button>);
         break;
 
       case "loaned":
-        buttons.push(<NumericInputButton label="REPAY LOAN" action={repay} tokenId={item.tokenId} />);
+        buttons.push(<button onClick={() => repay(item.tokenId)}>REPAY LOAN</button>);
         break;
 
       default:
@@ -202,10 +229,12 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
       </div>
     );
   };
+
   console.log("allItems", allItems);
   return (
-    <div style={{ display: "flex" }}>
-      {setLoaded && Object.keys(allItems).map(key => <Tile item={allItems[key]} />)}
+    <div>
+      eth reserves in contract: <Balance address={protoAddy} provider={localProvider} price={price} />
+      minimum reserves: 10.0 interest rate loan duration loan count total amount owed staked count total holders
     </div>
   );
 }

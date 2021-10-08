@@ -2421,6 +2421,11 @@
   resolved "https://registry.yarnpkg.com/@rarible/ethereum-provider/-/ethereum-provider-0.5.1.tgz#8fd78ab84bcc5ebf180a0591eae6e8f1e29021ab"
   integrity sha512-i5fAWf5x0O1Evo/iONISHiTWhytC8vxwZLjkTthIsSubzqx4ZzGdtAgtmmADxmfzAzdwZsl2z7nSSzbaGKY/3w==
 
+"@rarible/ethereum-provider@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@rarible/ethereum-provider/-/ethereum-provider-0.6.0.tgz#0d6e0ae8a0134c882e7237da47c84f76e70c7fcc"
+  integrity sha512-15Wov7hG0swgOJNoRjLA+chfATkT74E3k/5RrEpvhwhEMkehEM2mkyxA4pPbNI2DsU3nJbVo+4L2X+iQcQKqdA==
+
 "@rarible/protocol-api-client@0.1.7":
   version "0.1.7"
   resolved "https://registry.yarnpkg.com/@rarible/protocol-api-client/-/protocol-api-client-0.1.7.tgz#7a125eaed2083052deb5f7bf7dba409246011d47"

@@ -21,7 +21,7 @@ import {
 import { useEventListener } from "eth-hooks/events/useEventListener";
 import { useExchangeEthPrice } from "eth-hooks/dapps/dex";
 // import Hints from "./Hints";
-import { ExampleUI, Hints, Subgraph } from "./views";
+import { ExampleUI, Hints, Subgraph, AdminDash } from "./views";
 
 import { useContractConfig } from "./hooks";
 import Portis from "@portis/web3";
@@ -31,7 +31,6 @@ import { createRaribleSdk } from "@rarible/protocol-ethereum-sdk";
 
 const { ethers } = require("ethers");
 const sdk = createRaribleSdk(ethers, "rinkeby");
-
 const compoundAddress = "0xd6801a1dffcd0a410336ef88def4320d6df1883e";
 const me = "0xE7aa7AF667016837733F3CA3809bdE04697730eF".toLowerCase();
 
@@ -468,17 +467,7 @@ function App(props) {
               }}
               to="/"
             >
-              WenPassiveIncomeProtocol
-            </Link>
-          </Menu.Item>
-          <Menu.Item key="/hints">
-            <Link
-              onClick={() => {
-                setRoute("/hints");
-              }}
-              to="/hints"
-            >
-              Hints
+              WenPassiveIncomeProtocol Admin Dash
             </Link>
           </Menu.Item>
           <Menu.Item key="/exampleui">
@@ -488,17 +477,7 @@ function App(props) {
               }}
               to="/exampleui"
             >
-              ExampleUI
-            </Link>
-          </Menu.Item>
-          <Menu.Item key="/rarible">
-            <Link
-              onClick={() => {
-                setRoute("/rarible");
-              }}
-              to="/rarible"
-            >
-              WenPassiveIncomeNftRarible
+              User Dashboard
             </Link>
           </Menu.Item>
           {/*<Menu.Item key="/subgraph">
@@ -528,15 +507,35 @@ function App(props) {
                 address={address}
                 blockExplorer={blockExplorer}
                 contractConfig={contractConfig}
+                show={[
+                  "addReward",
+                  "liquidate",
+                  "loaned",
+                  "staked",
+                  "loanDuration",
+                  "setLoanInterestRate",
+                  "setLoanDuration",
+                  "loanInterestRate",
+                  "minimumReserves",
+                  "setMinimumReserves",
+                ]}
               />
               <Contract
+                name="WenPassiveIncomeNFTRarible"
+                customContract={rinkebyContracts && rinkebyContracts.WenPassiveIncomeNFTRarible}
+                signer={userSigner}
+                provider={localProvider}
+                address={me}
+                blockExplorer="https://rinkeby.etherscan.io/"
+              />
+              {/* <Contract
                 name="WenPassiveIncomeNFT"
                 signer={userSigner}
                 provider={localProvider}
                 address={address}
                 blockExplorer={blockExplorer}
                 contractConfig={contractConfig}
-              />
+              /> */}
             </div>
           </Route>
           <Route path="/hints">
@@ -575,16 +574,6 @@ function App(props) {
             chainId={3}
           /> */}
 
-          <Route path="/rarible">
-            <Contract
-              name="WenPassiveIncomeNFTRarible"
-              customContract={rinkebyContracts && rinkebyContracts.WenPassiveIncomeNFTRarible}
-              signer={userSigner}
-              provider={localProvider}
-              address={me}
-              blockExplorer="https://rinkeby.etherscan.io/"
-            />
-          </Route>
           {/* <Route path="/subgraph">
             <Subgraph
               subgraphUri={props.subgraphUri}
