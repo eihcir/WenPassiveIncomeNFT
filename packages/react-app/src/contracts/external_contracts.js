@@ -1417,7 +1417,7 @@ module.exports = {
   4: {
     contracts: {
       WenPassiveIncomeNFTRarible: {
-        address: "0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117",
+        address: "0xd845533626e52ccc6282160c19861581b14aa233",
         abi: [
           {
             inputs: [],

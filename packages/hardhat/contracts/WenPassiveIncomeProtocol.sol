@@ -55,6 +55,8 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
     bytes32 public rewardAmountsHash; // hash of rewardAmounts
 
     uint256 public minimumReserves; //minimum amount of Eth retained in this contract
+    uint256 public maximumReserves; //maximum amount of Eth retained in this contract
+    uint256 public maximumLoan; //minimum amount of Eth retained in this contract
     uint256 public loanInterestRate; //interest rate to charge up front
     uint256 public loanDuration; //days
 
@@ -77,15 +79,11 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         return this.onERC721Received.selector;
     }
 
-    //notice: Automatically deposits into vault any excess over minimum reserves
+    //notice: Automatically deposits into vault any excess over maximum reserves
     receive() external payable {
-        if (address(this).balance + msg.value > minimumReserves) {
-            uint256 amountOut = msg.value +
-                address(this).balance -
-                minimumReserves;
-            if (amountOut < address(this).balance) {
-                deposit(amountOut);
-            }
+        if (address(this).balance > maximumReserves) {
+            uint256 amountOut = address(this).balance - maximumReserves;
+            deposit(amountOut);
         }
         emit EthReceived(msg.sender, msg.value);
     }
@@ -98,7 +96,7 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
     //@notice Deposit in vault, receive vault tokens
     //@param wad Amount to deposit
     function deposit(uint256 wad) public {
-        (bool success, ) = address(vaultToken).call{value: wad, gas: 100000}(
+        (bool success, ) = address(vaultToken).call{value: wad, gas: 250000}(
             abi.encodeWithSignature("mint()")
         );
         require(success, "Failed to deposit");
@@ -106,12 +104,15 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         emit Deposited(wad);
     }
 
-    //@notice Redeem vault tokens for eth
+    //@notice Redeem vault tokens for ether
     //@param wad Amount to redeem
     function withdraw(uint256 wad) public {
         vaultDeposits -= wad;
-        uint256 res = vaultToken.redeem(wad);
-        require(res == 0, "Failed to withdraw");
+        (bool success, ) = address(vaultToken).call{value: wad, gas: 250000}(
+            abi.encodeWithSignature("redeem()", wad)
+        );
+        require(success, "Failed to withdraw");
+
         emit Withdrawn(wad);
     }
 
@@ -199,14 +200,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         require(staked[tokenId].user == msg.sender, "Unauthorized");
         uint256[] memory rewardAmounts_ = rewardAmounts;
         uint256[] memory rewardTimes_ = rewardTimes;
-        require(
-            keccak256(abi.encode(rewardAmounts_)) == rewardAmountsHash,
-            "Invalid"
-        );
-        require(
-            keccak256(abi.encode(rewardTimes_)) == rewardTimesHash,
-            "Invalid"
-        );
 
         StakedData memory stakedData = staked[tokenId];
         uint256 totalRewards = 0;
@@ -285,12 +278,17 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         LoanData memory loanData = loaned[tokenId];
         require(loanData.user == msg.sender, "Unauthorized");
         require(msg.value <= loanData.owed, "overpayment");
+        emit EthReceived(msg.sender, msg.value);
         loansReceivable -= msg.value;
         if (msg.value == loanData.owed) {
             _release(tokenId);
             loanedCount -= 1;
         } else {
             loaned[tokenId].owed = loanData.owed - msg.value;
+        }
+        if (address(this).balance > maximumReserves) {
+            uint256 amountOut = address(this).balance - maximumReserves;
+            deposit(amountOut);
         }
         emit Repaid(msg.sender, tokenId, msg.value);
     }
@@ -308,6 +306,21 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
     function setMinimumReserves(uint256 minimumReserves_) external {
         minimumReserves = minimumReserves_;
         emit MinimumReservesSet(minimumReserves_);
+    }
+
+    //@notice Used to set maximum reserves of eth held by this contract
+    //@param wad Amount in eth
+    function setMaximumReserves(uint256 maximumReserves_) external {
+        maximumReserves = maximumReserves_;
+        emit MaximumReservesSet(maximumReserves_);
+    }
+
+
+    //@notice Used to set maximum loan amount
+    //@param wad Amount in eth
+    function setMaximumLoan(uint256 maximumLoan_) external {
+        maximumLoan = maximumLoan_;
+        emit MaximumLoanSet(maximumLoan_);
     }
 
     //@notice Used to set upfront interest rate taken for loans

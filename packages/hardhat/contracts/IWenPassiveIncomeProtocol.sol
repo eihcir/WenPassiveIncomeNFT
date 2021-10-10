@@ -24,6 +24,8 @@ interface IWenPassiveIncomeProtocol {
     );
     event LoanDurationSet(uint256 amount);
     event LoanInterestRateSet(uint256 amount);
+    event MaximumLoanSet(uint256 amount);
+    event MaximumReservesSet(uint256 amount);
     event MinimumReservesSet(uint256 amount);
     event Repaid(address indexed guy, uint256 tokenId, uint256 amount);
     event RewardAdded(uint256 wad, uint256 timestamp);

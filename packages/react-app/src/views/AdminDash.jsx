@@ -6,7 +6,7 @@ import { Address, Balance } from "../components";
 
 import axios from "axios";
 const me = "0xE7aa7AF667016837733F3CA3809bdE04697730eF".toLowerCase();
-const nftAddy = "0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117".toLowerCase();
+const nftAddy = "0xd845533626e52ccc6282160c19861581b14aa233".toLowerCase();
 const convertBig = x => ethers.utils.hexlify(ethers.BigNumber.from(x.toString()));
 
 const data = {

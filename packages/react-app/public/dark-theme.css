@@ -855,10 +855,13 @@ optgroup,
 select,
 textarea {
   margin: 0;
-  color: inherit;
   font-size: inherit;
   font-family: inherit;
   line-height: inherit;
+}
+.button {
+  background-color: lightcoral !important;
+  color: blue !important;
 }
 button,
 input {

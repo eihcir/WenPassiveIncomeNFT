@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { Address, Balance } from "../components";
 
 const me = "0xE7aa7AF667016837733F3CA3809bdE04697730eF".toLowerCase();
-const nftAddy = "0x3d87D8fbB1E537Aa50B0876ca13AD6D464678117".toLowerCase();
+const nftAddy = "0xd845533626e52ccc6282160c19861581b14aa233".toLowerCase();
 const convertBig = x => ethers.utils.hexlify(ethers.BigNumber.from(x.toString()));
 
 export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) {
@@ -47,14 +47,10 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
       } else if (owners.includes(protoAddy)) {
         const staked = await readContracts.WenPassiveIncomeProtocol.staked(convertBig(item.tokenId));
         if (staked[0].toLowerCase() == me) {
-          console.log("staked", staked);
           item.status = "staked";
           items[item.tokenId] = item;
         }
         const loaned = await readContracts.WenPassiveIncomeProtocol.loaned(convertBig(item.tokenId));
-        console.log("loaned", loaned);
-        console.log("amount", ethers.BigNumber.from(loaned[1]).toString());
-        console.log("amountEth", ethers.utils.parseEther(ethers.BigNumber.from(loaned[1]).toString()).toString());
         if (loaned[0].toLowerCase() == me) {
           item.status = "loaned";
           items[item.tokenId] = item;
@@ -63,7 +59,6 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
     }
     setLoaded(true);
     setLoading(false);
-    console.log("allitems", items);
     setAllItems(items);
   }
 
@@ -141,7 +136,7 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
   );
 
   const NumericInputButton = ({ action, label, tokenId }) => {
-    const [value, setValue] = useState("0.1");
+    const [value, setValue] = useState("1.0");
     const [pressed, setPressed] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const handleClick = () => setPressed(true);
@@ -152,27 +147,60 @@ export default function ExampleUI({ sdk, sdk2, readContracts, writeContracts }) 
         action(tokenId, value);
       }
     };
-    if (submitted) return <button>Confirming...</button>;
+    if (submitted) return <button style={{ backgroundColor: "lightgrey", color: "black" }}>Confirming...</button>;
     if (pressed)
       return (
-        <button>
+        <button style={{ backgroundColor: "lightgrey", color: "black" }}>
           <input type="text" onChange={e => setValue(e.target.value)} value={value} onKeyPress={handleKeyPress} />
+          <div>
+            <div>
+              {" "}
+              Max <bold style={{ fontWeight: "bold" }}>1 eth</bold>
+            </div>
+            <div>
+              {" "}
+              <bold style={{ fontWeight: "bold" }}>10%</bold> interest paid up front
+            </div>
+            <div>
+              {" "}
+              Due in <bold style={{ fontWeight: "bold" }}>30</bold> days
+            </div>
+          </div>
         </button>
       );
-    return <button onClick={handleClick}>{label}</button>;
+    return (
+      <button style={{ backgroundColor: "lightgrey", color: "black" }} onClick={handleClick}>
+        {label}
+      </button>
+    );
   };
 
   const Buttons = ({ item }) => {
     const buttons = [];
     switch (item.status) {
       case "staked":
-        buttons.push(<button onClick={() => claimRewardsAndUnstake(item.tokenId)}>CLAIM REWARDS AND UNSTAKE</button>);
-        buttons.push(<button onClick={() => claimRewards(item.tokenId)}>CLAIM REWARDS</button>);
+        buttons.push(
+          <button
+            style={{ backgroundColor: "lightgrey", color: "black" }}
+            onClick={() => claimRewardsAndUnstake(item.tokenId)}
+          >
+            CLAIM REWARDS AND UNSTAKE
+          </button>,
+        );
+        buttons.push(
+          <button style={{ backgroundColor: "lightgrey", color: "black" }} onClick={() => claimRewards(item.tokenId)}>
+            CLAIM REWARDS
+          </button>,
+        );
         break;
 
       case "owned":
-        buttons.push(<button onClick={() => stake(item.tokenId)}>STAKE</button>);
-        // buttons.push(<button onClick={() => borrow(item.tokenId)}>BORROW</button>);
+        buttons.push(
+          <button style={{ backgroundColor: "lightgrey", color: "black" }} onClick={() => stake(item.tokenId)}>
+            STAKE
+          </button>,
+        );
+        // buttons.push(<button style={{backgroundColor: 'lightgrey', 'color': 'white'}}onClick={() => borrow(item.tokenId)}>BORROW</button>);
         buttons.push(<NumericInputButton label="BORROW" action={borrow} tokenId={item.tokenId} />);
         break;
 

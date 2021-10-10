@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Link, Route, Switch } from "react-router-dom";
 import Web3Modal from "web3modal";
 import "./App.css";
-import { Account, Contract, Faucet, GasGauge, Header, Ramp, ThemeSwitch } from "./components";
+import { Account, Contract, Contract2, Faucet, GasGauge, Header, Ramp, ThemeSwitch } from "./components";
 import { INFURA_ID, NETWORK, NETWORKS } from "./constants";
 import { Transactor } from "./helpers";
 import {
@@ -31,7 +31,7 @@ import { createRaribleSdk } from "@rarible/protocol-ethereum-sdk";
 
 const { ethers } = require("ethers");
 const sdk = createRaribleSdk(ethers, "rinkeby");
-const compoundAddress = "0xd6801a1dffcd0a410336ef88def4320d6df1883e";
+// const compoundAddress = "0xd6801a1dffcd0a410336ef88def4320d6df1883e";
 const me = "0xE7aa7AF667016837733F3CA3809bdE04697730eF".toLowerCase();
 
 /*
@@ -477,7 +477,7 @@ function App(props) {
               }}
               to="/exampleui"
             >
-              User Dashboard
+              Super Awesome NFT User Dash
             </Link>
           </Menu.Item>
           {/*<Menu.Item key="/subgraph">
@@ -500,7 +500,7 @@ function App(props) {
                 and give you a form to interact with it locally
             */}
             <div>
-              <Contract
+              <Contract2
                 name="WenPassiveIncomeProtocol"
                 signer={userSigner}
                 provider={localProvider}
@@ -508,16 +508,25 @@ function App(props) {
                 blockExplorer={blockExplorer}
                 contractConfig={contractConfig}
                 show={[
-                  "addReward",
-                  "liquidate",
-                  "loaned",
-                  "staked",
-                  "loanDuration",
-                  "setLoanInterestRate",
-                  "setLoanDuration",
-                  "loanInterestRate",
                   "minimumReserves",
+                  "maximumReserves",
+                  "vaultDeposits",
+                  "loanedCount",
+                  "loansReceivable",
+                  "stakedCount",
+                  "loanInterestRate",
+                  "maximumLoan",
+                  "addReward",
+                  "setMaximumLoan",
+                  "setLoanInterestRate",
+                  "setMaximumReserves",
                   "setMinimumReserves",
+                  "token",
+                  "vaultToken",
+                  "withdraw",
+                  "liquidate",
+                  "receiveFunds",
+                  "transfer",
                 ]}
               />
               <Contract
