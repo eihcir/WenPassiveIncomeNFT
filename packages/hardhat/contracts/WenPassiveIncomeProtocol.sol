@@ -56,7 +56,7 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
 
     uint256 public minimumReserves; //minimum amount of Eth retained in this contract
     uint256 public maximumReserves; //maximum amount of Eth retained in this contract
-    uint256 public maximumLoan; //minimum amount of Eth retained in this contract
+    uint256 public maximumLoan; //maximum amount of loan allowed
     uint256 public loanInterestRate; //interest rate to charge up front
     uint256 public loanDuration; //days
 
@@ -83,11 +83,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
             deposit(amountOut);
         }
         emit EthReceived(msg.sender, msg.value);
-    }
-
-    //@notice Direct transfer to the smart contract, skips vault deposits
-    function receiveFunds() external payable {
-        emit EthReceived( msg.sender, msg.value);
     }
 
     //@notice Deposit in vault, receive vault tokens
@@ -126,13 +121,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         emit Staked(msg.sender, tokenId);
     }
 
-    //@notice Useful for transferring liquidated NFTs
-    //@param tokenId Id of token being transfered
-    //@param guy Address of recipient
-    function transfer(uint256 tokenId, address guy) external {
-        token.safeTransferFrom(address(this), guy, tokenId);
-    }
-
     //@notice Internal function for unstaking
     //@param tokenId Id of token being unstaked
     function _unstake(uint256 tokenId) internal {
@@ -144,7 +132,7 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
 
     //@notice Used to claim rewards and (optionally) unstake NFT
     //@param tokenId Id of token to claim rewards for
-    //@param and_unstake Set to true if returning NFT to owner, setting false updats timestamp
+    //@param and_unstake Set to true if returning NFT to owner, setting false updates timestamp
     //@dev To save gas, the rewardAmounts[] and rewardTimes[] are passed in with the other arguments
     //and checked against their stored hash. Reading from calldata instead of SLOAD saves 90%+ gas
     //https://medium.com/coinmonks/full-knowledge-user-proofs-working-with-storage-without-paying-for-gas-e124cef0c078
@@ -200,6 +188,7 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
     //@wad loan amount in eth
     function borrow(uint256 tokenId, uint256 wad) external {
         require(token.ownerOf(tokenId) == msg.sender, "Not owned");
+        require(wad <= maximumLoan, "Too much");
         require(
             token.isApprovedForAll(msg.sender, address(this)),
             "Not approved"
@@ -224,15 +213,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         emit CollateralReleased(msg.sender, tokenId);
     }
 
-    //@notice Used to liquidate overdue loan by seizing NFT
-    //@param tokenId Id of token used as collateral for overdue loans
-    function liquidate(uint256 tokenId) external {
-        LoanData memory loaned_ = loaned[tokenId];
-        require(block.timestamp > loaned_.timestamp + loanDuration, "Loan healthy");
-        loaned[tokenId] = LoanData(address(0), 0, 0);
-        emit Liquidated(loaned_.user, tokenId);
-    }
-
     //@notice Used to repay loan
     //@param tokenId Id of token used as collateral
     function repay(uint256 tokenId) external payable {
@@ -252,9 +232,25 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         emit Repaid(msg.sender, tokenId, msg.value);
     }
 
+    //@notice Used to liquidate overdue loan by seizing NFT
+    //@param tokenId Id of token used as collateral for overdue loans
+    function liquidate(uint256 tokenId) external {
+        LoanData memory loaned_ = loaned[tokenId];
+        require(block.timestamp > loaned_.timestamp + loanDuration, "Loan not matured");
+        loaned[tokenId] = LoanData(address(0), 0, 0);
+        emit Liquidated(loaned_.user, tokenId);
+    }
+
+        //@notice Useful for transferring liquidated NFTs
+    //@param tokenId Id of token being transfered
+    //@param guy Address of recipient
+    function transfer(uint256 tokenId, address guy) external {
+        token.safeTransferFrom(address(this), guy, tokenId);
+    }
+
     //@notice Used by admin to set Vault contract for use with deposits
     //@param Address of vault
-    //@dev Becareful if changing this, redeem Vault deposits first
+    //@dev Be careful if changing this, redeem Vault deposits first
     function setVaultToken(ICETH token_) external {
         vaultToken = token_;
         emit VaultTokenSet(address(token_));
