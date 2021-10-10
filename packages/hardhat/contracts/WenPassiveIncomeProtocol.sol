@@ -60,13 +60,10 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
     uint256 public loanInterestRate; //interest rate to charge up front
     uint256 public loanDuration; //days
 
-    uint256 public stakedCount; // Used for demo purposes
-    uint256 public loanedCount; // Used for demo purposes
-    uint256 public loansReceivable; // Used for demo purposes
-    uint256 public vaultDeposits; // Used for demo purposes
-
     constructor(IERC721 token_) {
         token = token_;
+        rewardAmountsHash = keccak256(abi.encode(rewardAmounts));
+        rewardTimesHash = keccak256(abi.encode(rewardTimes));
     }
 
     // @notice This function is required for any contract supporting safeTransfers
@@ -100,14 +97,12 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
             abi.encodeWithSignature("mint()")
         );
         require(success, "Failed to deposit");
-        vaultDeposits += wad;
         emit Deposited(wad);
     }
 
     //@notice Redeem vault tokens for ether
     //@param wad Amount to redeem
     function withdraw(uint256 wad) public {
-        vaultDeposits -= wad;
         (bool success, ) = address(vaultToken).call{value: wad, gas: 250000}(
             abi.encodeWithSignature("redeem()", wad)
         );
@@ -126,7 +121,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         );
 
         staked[tokenId] = StakedData(msg.sender, block.timestamp);
-        stakedCount += 1;
 
         token.safeTransferFrom(msg.sender, address(this), tokenId);
         emit Staked(msg.sender, tokenId);
@@ -144,7 +138,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
     function _unstake(uint256 tokenId) internal {
         staked[tokenId] = StakedData(address(0), 0);
         token.approve(msg.sender, tokenId);
-        stakedCount -= 1;
         token.safeTransferFrom(address(this), msg.sender, tokenId);
         emit Unstaked(msg.sender, tokenId);
     }
@@ -155,7 +148,7 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
     //@dev To save gas, the rewardAmounts[] and rewardTimes[] are passed in with the other arguments
     //and checked against their stored hash. Reading from calldata instead of SLOAD saves 90%+ gas
     //https://medium.com/coinmonks/full-knowledge-user-proofs-working-with-storage-without-paying-for-gas-e124cef0c078
-    function claimRewardsUserProof(
+    function claimRewards(
         uint256 tokenId,
         bool and_unstake,
         uint256[] calldata rewardAmounts_,
@@ -170,36 +163,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
             keccak256(abi.encode(rewardTimes_)) == rewardTimesHash,
             "Invalid"
         );
-
-        StakedData memory stakedData = staked[tokenId];
-        uint256 totalRewards = 0;
-        for (uint256 idx = 0; idx < rewardTimes_.length; idx++) {
-            if (rewardTimes_[idx] >= stakedData.timestamp) {
-                totalRewards += rewardAmounts_[idx];
-            }
-        }
-
-        if (and_unstake) {
-            _unstake(tokenId);
-        } else {
-            staked[tokenId] = StakedData(msg.sender, block.timestamp);
-        }
-
-        (bool success, ) = msg.sender.call{value: totalRewards}("");
-        require(success, "Failed transfer");
-        emit RewardsClaimed(msg.sender, tokenId, totalRewards);
-    }
-
-    //@notice Used to claim rewards and (optionally) unstake NFT
-    //@param tokenId Id of token to claim rewards for
-    //@param and_unstake Set to true if returning NFT to owner, setting false updats timestamp
-    function claimRewards(
-        uint256 tokenId,
-        bool and_unstake
-    ) external {
-        require(staked[tokenId].user == msg.sender, "Unauthorized");
-        uint256[] memory rewardAmounts_ = rewardAmounts;
-        uint256[] memory rewardTimes_ = rewardTimes;
 
         StakedData memory stakedData = staked[tokenId];
         uint256 totalRewards = 0;
@@ -243,8 +206,6 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         );
 
         loaned[tokenId] = LoanData(msg.sender, block.timestamp, wad);
-        loanedCount += 1;
-        loansReceivable += wad;
         token.safeTransferFrom(msg.sender, address(this), tokenId);
 
         uint256 netAmount = wad * (1e18 - loanInterestRate) / 1e18;
@@ -279,10 +240,8 @@ contract WenPassiveIncomeProtocol is IWenPassiveIncomeProtocol {
         require(loanData.user == msg.sender, "Unauthorized");
         require(msg.value <= loanData.owed, "overpayment");
         emit EthReceived(msg.sender, msg.value);
-        loansReceivable -= msg.value;
         if (msg.value == loanData.owed) {
             _release(tokenId);
-            loanedCount -= 1;
         } else {
             loaned[tokenId].owed = loanData.owed - msg.value;
         }
